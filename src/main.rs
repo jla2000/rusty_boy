@@ -117,6 +117,20 @@ struct Instruction {
     pub disassemble: Box<dyn Fn(&dyn Disassembler) -> String>,
 }
 
+impl Instruction {
+    #[inline]
+    fn new<E, D>(execute: E, disassemble: D) -> Self
+    where
+        E: Fn(&mut Context) + 'static,
+        D: Fn(&dyn Disassembler) -> String + 'static,
+    {
+        Self {
+            execute: Box::new(execute),
+            disassemble: Box::new(disassemble),
+        }
+    }
+}
+
 trait Disassembler {
     fn address(&self) -> String;
     fn peek_u8(&self) -> String;
@@ -181,59 +195,53 @@ impl Disassembler for DynamicDisassembler<'_> {
 }
 
 fn load_reg8(dst: u8, src: u8) -> Instruction {
-    Instruction {
-        execute: Box::new(move |ctx| {
+    Instruction::new(
+        move |ctx| {
             let value = ctx.read_reg8(src);
             ctx.write_reg8(dst, value);
-        }),
-        disassemble: Box::new(move |_| format!("ld {}, {}", reg8_to_str(dst), reg8_to_str(src))),
-    }
+        },
+        move |_| format!("ld {}, {}", reg8_to_str(dst), reg8_to_str(src)),
+    )
 }
 
 fn load_reg8_mem(dst: u8) -> Instruction {
-    Instruction {
-        execute: Box::new(move |ctx| {
+    Instruction::new(
+        move |ctx| {
             let address = ctx.read_reg16(REG_HL);
             let value = ctx.read_u8(address);
             ctx.write_reg8(dst, value);
-        }),
-        disassemble: Box::new(move |disassembler| {
-            format!("ld {}, {}", reg8_to_str(dst), disassembler.address())
-        }),
-    }
+        },
+        move |disassembler| format!("ld {}, {}", reg8_to_str(dst), disassembler.address()),
+    )
 }
 
 fn load_reg8_const(dst: u8) -> Instruction {
-    Instruction {
-        execute: Box::new(move |ctx| {
+    Instruction::new(
+        move |ctx| {
             let value = ctx.load_u8_const();
             ctx.write_reg8(dst, value);
-        }),
-        disassemble: Box::new(move |disassembler| {
-            format!("ld {}, {}", reg8_to_str(dst), disassembler.peek_u8())
-        }),
-    }
+        },
+        move |disassembler| format!("ld {}, {}", reg8_to_str(dst), disassembler.peek_u8()),
+    )
 }
 
 fn load_reg16_const(dst: u8) -> Instruction {
-    Instruction {
-        execute: Box::new(move |ctx| {
+    Instruction::new(
+        move |ctx| {
             let value = ctx.load_u16_const();
             ctx.write_reg16(dst, value);
-        }),
-        disassemble: Box::new(move |disassembler| {
-            format!("ld {}, {}", reg16_to_str(dst), disassembler.peek_u16())
-        }),
-    }
+        },
+        move |disassembler| format!("ld {}, {}", reg16_to_str(dst), disassembler.peek_u16()),
+    )
 }
 
 fn illegal_opcode(opcode: u8) -> Instruction {
-    Instruction {
-        execute: Box::new(move |_| {
+    Instruction::new(
+        move |_| {
             panic!("Invalid opcode {opcode:02x}");
-        }),
-        disassemble: Box::new(move |_| String::from("illegal")),
-    }
+        },
+        move |_| String::from("illegal"),
+    )
 }
 
 #[bitmatch]
