@@ -114,10 +114,19 @@ impl Context {
 
 struct Instruction {
     pub execute: Box<dyn Fn(&mut Context)>,
-    pub disassembly: String,
+    pub disassemble: Box<dyn Fn(&dyn Disassembler) -> String>,
 }
 
-fn reg_to_str(reg: u8) -> &'static str {
+trait Disassembler {
+    fn address(&self) -> String;
+    fn peek_u8(&self) -> String;
+    fn peek_u16(&self) -> String;
+}
+
+struct StaticDisassembler;
+struct DynamicDisassembler<'a>(&'a mut Context);
+
+fn reg8_to_str(reg: u8) -> &'static str {
     match reg {
         REG_B => "b",
         REG_C => "c",
@@ -130,6 +139,46 @@ fn reg_to_str(reg: u8) -> &'static str {
         _ => "<invalid>",
     }
 }
+fn reg16_to_str(reg: u8) -> &'static str {
+    match reg {
+        REG_BC => "bc",
+        REG_DE => "de",
+        REG_HL => "hl",
+        REG_SP => "sp",
+        _ => "<invalid>",
+    }
+}
+
+impl Disassembler for StaticDisassembler {
+    fn address(&self) -> String {
+        String::from("(hl)")
+    }
+    fn peek_u8(&self) -> String {
+        String::from("n")
+    }
+    fn peek_u16(&self) -> String {
+        String::from("nn")
+    }
+}
+
+impl Disassembler for DynamicDisassembler<'_> {
+    fn address(&self) -> String {
+        format!("@{:04x}", self.0.read_reg16(REG_HL))
+    }
+    fn peek_u8(&self) -> String {
+        format!(
+            "${:02x}",
+            self.0.memory[(self.0.program_counter + 1) as usize]
+        )
+    }
+    fn peek_u16(&self) -> String {
+        format!(
+            "${:02x}{:02x}",
+            self.0.memory[(self.0.program_counter + 1) as usize],
+            self.0.memory[(self.0.program_counter + 2) as usize]
+        )
+    }
+}
 
 fn load_reg8(dst: u8, src: u8) -> Instruction {
     Instruction {
@@ -137,7 +186,7 @@ fn load_reg8(dst: u8, src: u8) -> Instruction {
             let value = ctx.read_reg8(src);
             ctx.write_reg8(dst, value);
         }),
-        disassembly: format!("ld {}, {}", reg_to_str(dst), reg_to_str(src)),
+        disassemble: Box::new(move |_| format!("ld {}, {}", reg8_to_str(dst), reg8_to_str(src))),
     }
 }
 
@@ -148,7 +197,9 @@ fn load_reg8_mem(dst: u8) -> Instruction {
             let value = ctx.read_u8(address);
             ctx.write_reg8(dst, value);
         }),
-        disassembly: format!("ld {}, (hl)", reg_to_str(dst)),
+        disassemble: Box::new(move |disassembler| {
+            format!("ld {}, {}", reg8_to_str(dst), disassembler.address())
+        }),
     }
 }
 
@@ -158,7 +209,9 @@ fn load_reg8_const(dst: u8) -> Instruction {
             let value = ctx.load_u8_const();
             ctx.write_reg8(dst, value);
         }),
-        disassembly: format!("ld {}, n", reg_to_str(dst)),
+        disassemble: Box::new(move |disassembler| {
+            format!("ld {}, {}", reg8_to_str(dst), disassembler.peek_u8())
+        }),
     }
 }
 
@@ -168,7 +221,9 @@ fn load_reg16_const(dst: u8) -> Instruction {
             let value = ctx.load_u16_const();
             ctx.write_reg16(dst, value);
         }),
-        disassembly: format!("ld {}, nn", reg_to_str(dst)),
+        disassemble: Box::new(move |disassembler| {
+            format!("ld {}, {}", reg16_to_str(dst), disassembler.peek_u16())
+        }),
     }
 }
 
@@ -177,7 +232,7 @@ fn illegal_opcode(opcode: u8) -> Instruction {
         execute: Box::new(move |_| {
             panic!("Invalid opcode {opcode:02x}");
         }),
-        disassembly: String::from("illegal"),
+        disassemble: Box::new(move |_| String::from("illegal")),
     }
 }
 
@@ -223,7 +278,8 @@ mod tests {
         ctx.write_u8(TEST_ADDRESS, TEST_VALUE_U8);
 
         let opcode = resolve_opcode(0b0111_1110);
-        assert_eq!(&opcode.disassembly, "ld a, (hl)");
+
+        assert_eq!((opcode.disassemble)(&StaticDisassembler {}), "ld a, (hl)");
 
         (opcode.execute)(&mut ctx);
         assert_eq!(ctx.read_reg8(REG_A), TEST_VALUE_U8);
@@ -236,7 +292,7 @@ mod tests {
         ctx.write_reg8(REG_B, TEST_VALUE_U8_2);
 
         let opcode = resolve_opcode(0b0100_0111);
-        assert_eq!(&opcode.disassembly, "ld b, a");
+        assert_eq!((opcode.disassemble)(&StaticDisassembler {}), "ld b, a");
 
         (opcode.execute)(&mut ctx);
         assert_eq!(ctx.read_reg8(REG_B), TEST_VALUE_U8);
