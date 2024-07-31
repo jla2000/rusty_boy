@@ -263,7 +263,15 @@ fn build_instruction_table() -> Box<[Instruction]> {
         .into_boxed_slice()
 }
 
-fn main() {}
+fn main() {
+    let table = build_instruction_table();
+    for opcode in 0..u8::MAX {
+        println!(
+            "0x{opcode:02x}: {}",
+            (table[opcode as usize].disassemble)(&StaticDisassembler)
+        );
+    }
+}
 
 #[cfg(test)]
 mod tests {
