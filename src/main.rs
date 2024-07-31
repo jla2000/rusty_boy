@@ -279,7 +279,11 @@ mod tests {
 
         let opcode = resolve_opcode(0b0111_1110);
 
-        assert_eq!((opcode.disassemble)(&StaticDisassembler {}), "ld a, (hl)");
+        assert_eq!((opcode.disassemble)(&StaticDisassembler), "ld a, (hl)");
+        assert_eq!(
+            (opcode.disassemble)(&DynamicDisassembler(&mut ctx)),
+            "ld a, @dead"
+        );
 
         (opcode.execute)(&mut ctx);
         assert_eq!(ctx.read_reg8(REG_A), TEST_VALUE_U8);
@@ -292,7 +296,11 @@ mod tests {
         ctx.write_reg8(REG_B, TEST_VALUE_U8_2);
 
         let opcode = resolve_opcode(0b0100_0111);
-        assert_eq!((opcode.disassemble)(&StaticDisassembler {}), "ld b, a");
+        assert_eq!((opcode.disassemble)(&StaticDisassembler), "ld b, a");
+        assert_eq!(
+            (opcode.disassemble)(&DynamicDisassembler(&mut ctx)),
+            "ld b, a"
+        );
 
         (opcode.execute)(&mut ctx);
         assert_eq!(ctx.read_reg8(REG_B), TEST_VALUE_U8);
