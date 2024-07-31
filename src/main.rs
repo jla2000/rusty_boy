@@ -1,5 +1,5 @@
 use bitmatch::bitmatch;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::format};
 
 struct Context {
     // Registers
@@ -112,46 +112,73 @@ impl Context {
     }
 }
 
-type TStates = (u8, u8);
-type Instruction = Box<dyn Fn(&mut Context) -> TStates>;
+struct Instruction {
+    pub execute: Box<dyn Fn(&mut Context)>,
+    pub disassembly: String,
+}
+
+fn reg_to_str(reg: u8) -> &'static str {
+    match reg {
+        REG_B => "b",
+        REG_C => "c",
+        REG_D => "d",
+        REG_E => "e",
+        REG_H => "h",
+        REG_L => "l",
+        REG_F => "f",
+        REG_A => "a",
+        _ => "<invalid>",
+    }
+}
 
 fn load_reg8(dst: u8, src: u8) -> Instruction {
-    Box::new(move |ctx| {
-        let value = ctx.read_reg8(src);
-        ctx.write_reg8(dst, value);
-        (1, 4)
-    })
+    Instruction {
+        execute: Box::new(move |ctx| {
+            let value = ctx.read_reg8(src);
+            ctx.write_reg8(dst, value);
+        }),
+        disassembly: format!("ld {}, {}", reg_to_str(dst), reg_to_str(src)),
+    }
 }
 
 fn load_reg8_mem(dst: u8) -> Instruction {
-    Box::new(move |ctx| {
-        let address = ctx.read_reg16(REG_HL);
-        let value = ctx.read_u8(address);
-        ctx.write_reg8(dst, value);
-        (1, 4)
-    })
+    Instruction {
+        execute: Box::new(move |ctx| {
+            let address = ctx.read_reg16(REG_HL);
+            let value = ctx.read_u8(address);
+            ctx.write_reg8(dst, value);
+        }),
+        disassembly: format!("ld {}, (hl)", reg_to_str(dst)),
+    }
 }
 
 fn load_reg8_const(dst: u8) -> Instruction {
-    Box::new(move |ctx| {
-        let value = ctx.load_u8_const();
-        ctx.write_reg8(dst, value);
-        (1, 4)
-    })
+    Instruction {
+        execute: Box::new(move |ctx| {
+            let value = ctx.load_u8_const();
+            ctx.write_reg8(dst, value);
+        }),
+        disassembly: format!("ld {}, n", reg_to_str(dst)),
+    }
 }
 
 fn load_reg16_const(dst: u8) -> Instruction {
-    Box::new(move |ctx| {
-        let value = ctx.load_u16_const();
-        ctx.write_reg16(dst, value);
-        (1, 4)
-    })
+    Instruction {
+        execute: Box::new(move |ctx| {
+            let value = ctx.load_u16_const();
+            ctx.write_reg16(dst, value);
+        }),
+        disassembly: format!("ld {}, nn", reg_to_str(dst)),
+    }
 }
 
 fn illegal_opcode(opcode: u8) -> Instruction {
-    Box::new(move |_| {
-        panic!("Invalid opcode {opcode:02x}");
-    })
+    Instruction {
+        execute: Box::new(move |_| {
+            panic!("Invalid opcode {opcode:02x}");
+        }),
+        disassembly: String::from("illegal"),
+    }
 }
 
 #[bitmatch]
@@ -168,7 +195,7 @@ fn resolve_opcode(opcode: u8) -> Instruction {
 
 fn build_instruction_table() -> Box<[Instruction]> {
     (0..u8::MAX)
-        .map(|opcode| resolve_opcode(opcode))
+        .map(resolve_opcode)
         .collect::<Vec<Instruction>>()
         .into_boxed_slice()
 }
@@ -195,7 +222,7 @@ mod tests {
         ctx.write_reg16(REG_HL, TEST_ADDRESS);
         ctx.write_u8(TEST_ADDRESS, TEST_VALUE_U8);
 
-        resolve_opcode(0b0111_1110)(&mut ctx);
+        (resolve_opcode(0b0111_1110).execute)(&mut ctx);
         assert_eq!(ctx.read_reg8(REG_A), TEST_VALUE_U8);
     }
 
@@ -205,7 +232,7 @@ mod tests {
         ctx.write_reg8(REG_A, TEST_VALUE_U8);
         ctx.write_reg8(REG_B, TEST_VALUE_U8_2);
 
-        resolve_opcode(0b0100_0111)(&mut ctx);
+        (resolve_opcode(0b0100_0111).execute)(&mut ctx);
         assert_eq!(ctx.read_reg8(REG_B), TEST_VALUE_U8);
     }
 }
