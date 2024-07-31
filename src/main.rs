@@ -1,5 +1,5 @@
 use bitmatch::bitmatch;
-use std::{collections::HashMap, sync::LazyLock};
+use std::collections::HashMap;
 
 struct Context {
     // Registers
@@ -11,6 +11,20 @@ struct Context {
     memory_refresh: u8,
     // Memory
     memory: [u8; 0xffff],
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Self {
+            general_purpose_regs: Default::default(),
+            program_counter: Default::default(),
+            stack_pointer: Default::default(),
+            index_x: Default::default(),
+            index_y: Default::default(),
+            memory_refresh: Default::default(),
+            memory: [0; 0xffff],
+        }
+    }
 }
 
 const REG_B: u8 = 0b000;
@@ -98,51 +112,100 @@ impl Context {
     }
 }
 
-fn nop(_: &mut Context) -> TStates {
-    (1, 4)
-}
-
 type TStates = (u8, u8);
-type OpcodeImpl = Box<dyn Fn(&mut Context) -> TStates>;
+type Instruction = Box<dyn Fn(&mut Context) -> TStates>;
 
-fn load_reg8(dst: u8, src: u8) -> OpcodeImpl {
+fn load_reg8(dst: u8, src: u8) -> Instruction {
     Box::new(move |ctx| {
-        let val = ctx.read_reg8(src);
-        ctx.write_reg8(dst, val);
+        let value = ctx.read_reg8(src);
+        ctx.write_reg8(dst, value);
         (1, 4)
     })
 }
 
-fn load_reg16_from_const(dst: u8) -> OpcodeImpl {
+fn load_reg8_mem(dst: u8) -> Instruction {
     Box::new(move |ctx| {
-        let val = ctx.load_u16_const();
-        ctx.write_reg16(dst, val);
+        let address = ctx.read_reg16(REG_HL);
+        let value = ctx.read_u8(address);
+        ctx.write_reg8(dst, value);
         (1, 4)
+    })
+}
+
+fn load_reg8_const(dst: u8) -> Instruction {
+    Box::new(move |ctx| {
+        let value = ctx.load_u8_const();
+        ctx.write_reg8(dst, value);
+        (1, 4)
+    })
+}
+
+fn load_reg16_const(dst: u8) -> Instruction {
+    Box::new(move |ctx| {
+        let value = ctx.load_u16_const();
+        ctx.write_reg16(dst, value);
+        (1, 4)
+    })
+}
+
+fn illegal_opcode(opcode: u8) -> Instruction {
+    Box::new(move |_| {
+        panic!("Invalid opcode {opcode:02x}");
     })
 }
 
 #[bitmatch]
-fn resolve_opcode(opcode: u8) -> OpcodeImpl {
+fn resolve_opcode(opcode: u8) -> Instruction {
     #[bitmatch]
     match opcode {
-        "01dd_dsss" => load_reg8(d.into(), s.into()),
-        "00dd_d110" => load_reg16_from_const(d.into()),
-        _ => Box::new(nop),
+        "01dd_d110" => load_reg8_mem(d),
+        "01dd_dsss" => load_reg8(d, s),
+        "00dd_d110" => load_reg8_const(d),
+        "00dd_d110" => load_reg16_const(d),
+        _ => illegal_opcode(opcode),
     }
 }
 
-fn main() {
-    let opcode_table = (0..u8::MAX)
-        .map(|opcode| (opcode, resolve_opcode(opcode)))
-        .collect::<HashMap<u8, OpcodeImpl>>();
+fn build_instruction_table() -> Box<[Instruction]> {
+    (0..u8::MAX)
+        .map(|opcode| resolve_opcode(opcode))
+        .collect::<Vec<Instruction>>()
+        .into_boxed_slice()
+}
 
-    opcode_table[&0x00](&mut Context {
-        general_purpose_regs: [0; 16],
-        program_counter: 0,
-        stack_pointer: 0,
-        index_x: 0,
-        index_y: 0,
-        memory_refresh: 0,
-        memory: [0; 0xffff],
-    });
+fn main() {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_ADDRESS: u16 = 0xDEAD;
+    const TEST_VALUE_U8: u8 = 0xBE;
+    const TEST_VALUE_U8_2: u8 = 0xEF;
+
+    #[test]
+    fn build_instruction_table_test() {
+        let table = build_instruction_table();
+        assert_eq!(table.len(), 0xff);
+    }
+
+    #[test]
+    fn load_reg8_mem_test() {
+        let mut ctx = Context::default();
+        ctx.write_reg16(REG_HL, TEST_ADDRESS);
+        ctx.write_u8(TEST_ADDRESS, TEST_VALUE_U8);
+
+        resolve_opcode(0b0111_1110)(&mut ctx);
+        assert_eq!(ctx.read_reg8(REG_A), TEST_VALUE_U8);
+    }
+
+    #[test]
+    fn load_reg8_test() {
+        let mut ctx = Context::default();
+        ctx.write_reg8(REG_A, TEST_VALUE_U8);
+        ctx.write_reg8(REG_B, TEST_VALUE_U8_2);
+
+        resolve_opcode(0b0100_0111)(&mut ctx);
+        assert_eq!(ctx.read_reg8(REG_B), TEST_VALUE_U8);
+    }
 }
