@@ -44,9 +44,9 @@ mod tests {
     const TEST_VALUE_U8_2: u8 = 0xEF;
 
     #[test]
-    fn build_instruction_table_test() {
+    fn build_instruction_set_test() {
         let table = build_instruction_set();
-        assert_eq!(table.len(), 0xff);
+        assert_eq!(table.len(), 256);
     }
 
     #[test]
