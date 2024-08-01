@@ -134,6 +134,7 @@ impl Context {
 
 struct Instruction {
     pub execute: Box<dyn Fn(&mut Context)>,
+    #[allow(clippy::type_complexity)]
     pub disassemble: Box<dyn Fn(&dyn Disassembler) -> String>,
 }
 
@@ -191,6 +192,20 @@ impl Disassembler for DynamicDisassembler<'_> {
     }
 }
 
+fn alu_add(left: u8, right: u8) -> (u8, u8) {
+    let result = left as u16 + right as u16;
+
+    let mut flags = 0;
+    // Sign
+    flags |= (result & 0b1000_0000) as u8;
+    // Zero
+    flags |= (1 << 6) * (result == 0) as u8;
+    // Carry
+    flags |= (result & 0b1_0000_0000) as u8;
+
+    (result as u8, flags)
+}
+
 fn load_reg8(dst: Reg8, src: Reg8) -> Instruction {
     Instruction::new(
         move |ctx| {
@@ -201,7 +216,7 @@ fn load_reg8(dst: Reg8, src: Reg8) -> Instruction {
     )
 }
 
-fn load_reg8_mem(dst: Reg8) -> Instruction {
+fn load_reg8_indirect(dst: Reg8) -> Instruction {
     Instruction::new(
         move |ctx| {
             let address = ctx.read_reg16(Reg16::HL);
@@ -232,6 +247,18 @@ fn load_reg16_const(dst: Reg16) -> Instruction {
     )
 }
 
+fn add_a(src: Reg8) -> Instruction {
+    Instruction::new(
+        move |ctx| {
+            let (value, flags) = alu_add(ctx.read_reg8(Reg8::A), ctx.read_reg8(src));
+            // TODO: implement proper flags
+            ctx.write_reg8(Reg8::F, flags);
+            ctx.write_reg8(Reg8::A, value);
+        },
+        move |_| format!("add A, {src:?}"),
+    )
+}
+
 fn illegal_opcode(opcode: u8) -> Instruction {
     Instruction::new(
         move |_| {
@@ -245,10 +272,11 @@ fn illegal_opcode(opcode: u8) -> Instruction {
 fn resolve_opcode(opcode: u8) -> Instruction {
     #[bitmatch]
     match opcode {
-        "01dd_d110" => load_reg8_mem(d.into()),
+        "01dd_d110" => load_reg8_indirect(d.into()),
         "01dd_dsss" => load_reg8(d.into(), s.into()),
         "00dd_d110" => load_reg8_const(d.into()),
-        "00dd_d110" => load_reg16_const(d.into()),
+        "00dd_0001" => load_reg16_const(d.into()),
+        "1000_0ddd" => add_a(d.into()),
         _ => illegal_opcode(opcode),
     }
 }
