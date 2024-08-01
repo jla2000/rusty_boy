@@ -1,4 +1,13 @@
+use std::ops::Deref;
+
 use bitmatch::bitmatch;
+
+const SIGN_BIT: u8 = 7;
+const ZERO_BIT: u8 = 6;
+const HALF_CARRY_BIT: u8 = 4;
+const PARITY_OVERFLOW_BIT: u8 = 2;
+const SUBTRACT_BIT: u8 = 1;
+const CARRY_BIT: u8 = 0;
 
 struct Context {
     // Registers
@@ -23,6 +32,31 @@ impl Default for Context {
             memory_refresh: Default::default(),
             memory: [0; 0xffff],
         }
+    }
+}
+
+impl Context {
+    pub fn set_flag(&mut self, flag: u8, value: bool) {
+        let flags = &mut self.general_purpose_regs[Reg8::F as usize];
+        if value {
+            *flags |= 1 << flag;
+        } else {
+            *flags &= !(1 << flag);
+        }
+    }
+
+    pub fn alu_add(&mut self, left: u8, right: u8) -> u8 {
+        let (result, carry) = left.overflowing_add(right);
+        self.set_flag(SIGN_BIT, left & 0b1000_0000 != 0);
+        self.set_flag(ZERO_BIT, result == 0);
+        self.set_flag(HALF_CARRY_BIT, ((left & 0xf) + (right & 0xf)) > 0xf);
+        self.set_flag(
+            PARITY_OVERFLOW_BIT,
+            (left as i8).overflowing_add(right as i8).1,
+        );
+        self.set_flag(SUBTRACT_BIT, false);
+        self.set_flag(CARRY_BIT, carry);
+        result
     }
 }
 
@@ -250,10 +284,8 @@ fn load_reg16_const(dst: Reg16) -> Instruction {
 fn add_a(src: Reg8) -> Instruction {
     Instruction::new(
         move |ctx| {
-            let (value, flags) = alu_add(ctx.read_reg8(Reg8::A), ctx.read_reg8(src));
-            // TODO: implement proper flags
-            ctx.write_reg8(Reg8::F, flags);
-            ctx.write_reg8(Reg8::A, value);
+            let result = ctx.alu_add(ctx.read_reg8(Reg8::A), ctx.read_reg8(src));
+            ctx.write_reg8(Reg8::A, result);
         },
         move |_| format!("add A, {src:?}"),
     )
