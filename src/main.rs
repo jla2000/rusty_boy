@@ -1,6 +1,7 @@
 use bitmatch::bitmatch;
 
 mod alu;
+use alu::*;
 
 struct Context {
     // Registers
@@ -194,20 +195,6 @@ impl Disassembler for DynamicDisassembler<'_> {
     }
 }
 
-fn alu_add(left: u8, right: u8) -> (u8, u8) {
-    let result = left as u16 + right as u16;
-
-    let mut flags = 0;
-    // Sign
-    flags |= (result & 0b1000_0000) as u8;
-    // Zero
-    flags |= (1 << 6) * (result == 0) as u8;
-    // Carry
-    flags |= (result & 0b1_0000_0000) as u8;
-
-    (result as u8, flags)
-}
-
 fn load_reg8(dst: Reg8, src: Reg8) -> Instruction {
     Instruction::new(
         move |ctx| {
@@ -254,7 +241,7 @@ fn add_a(src: Reg8) -> Instruction {
         move |ctx| {
             let (result, flags) = alu_add(ctx.read_reg8(Reg8::A), ctx.read_reg8(src));
             ctx.write_reg8(Reg8::A, result);
-            ctx.write_reg8(Reg8::F, flags);
+            ctx.write_reg8(Reg8::F, flags.into());
         },
         move |_| format!("add A, {src:?}"),
     )
