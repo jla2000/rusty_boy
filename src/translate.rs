@@ -4,9 +4,10 @@ use crate::alu::*;
 use crate::{Instruction, Reg16, Reg8};
 
 #[bitmatch]
-pub fn resolve_opcode(opcode: u8) -> Instruction {
+pub fn translate_opcode(opcode: u8) -> Instruction {
     #[bitmatch]
     match opcode {
+        "0000_0000" => nop(),
         "01dd_d110" => load_reg8_indirect(d.into()),
         "01dd_dsss" => load_reg8(d.into(), s.into()),
         "00dd_d110" => load_reg8_const(d.into()),
@@ -15,6 +16,10 @@ pub fn resolve_opcode(opcode: u8) -> Instruction {
         "1100_0011" => jump(),
         _ => illegal_opcode(opcode),
     }
+}
+
+fn nop() -> Instruction {
+    Instruction::new(move |_| {}, move |_| String::from("nop"))
 }
 
 fn load_reg8(dst: Reg8, src: Reg8) -> Instruction {

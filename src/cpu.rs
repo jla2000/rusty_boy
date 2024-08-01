@@ -1,29 +1,3 @@
-pub struct Cpu {
-    // Registers
-    pub general_purpose_regs: [u8; 16],
-    pub program_counter: u16,
-    pub stack_pointer: u16,
-    pub index_x: u16,
-    pub index_y: u16,
-    pub memory_refresh: u8,
-    // Memory
-    pub memory: [u8; 0xffff],
-}
-
-impl Default for Cpu {
-    fn default() -> Self {
-        Self {
-            general_purpose_regs: Default::default(),
-            program_counter: Default::default(),
-            stack_pointer: Default::default(),
-            index_x: Default::default(),
-            index_y: Default::default(),
-            memory_refresh: Default::default(),
-            memory: [0; 0xffff],
-        }
-    }
-}
-
 #[repr(u8)]
 #[derive(Debug, Copy, Clone)]
 pub enum Reg8 {
@@ -44,6 +18,32 @@ pub enum Reg16 {
     DE = 0b01,
     HL = 0b10,
     SP = 0b11,
+}
+
+pub struct Cpu {
+    // Registers
+    pub general_purpose_regs: [u8; 16],
+    pub program_counter: u16,
+    pub stack_pointer: u16,
+    pub index_x: u16,
+    pub index_y: u16,
+    pub memory_refresh: u8,
+    // Memory
+    pub memory: [u8; 0x10000],
+}
+
+impl Default for Cpu {
+    fn default() -> Self {
+        Self {
+            general_purpose_regs: Default::default(),
+            program_counter: Default::default(),
+            stack_pointer: Default::default(),
+            index_x: Default::default(),
+            index_y: Default::default(),
+            memory_refresh: Default::default(),
+            memory: [0; 0x10000],
+        }
+    }
 }
 
 impl From<u8> for Reg8 {
