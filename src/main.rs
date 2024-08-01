@@ -1,5 +1,4 @@
 use bitmatch::bitmatch;
-use std::{collections::HashMap, fmt::format};
 
 struct Context {
     // Registers
@@ -27,56 +26,77 @@ impl Default for Context {
     }
 }
 
-const REG_B: u8 = 0b000;
-const REG_C: u8 = 0b001;
-const REG_D: u8 = 0b010;
-const REG_E: u8 = 0b011;
-const REG_H: u8 = 0b100;
-const REG_L: u8 = 0b101;
-const REG_F: u8 = 0b110;
-const REG_A: u8 = 0b111;
-const REG_BC: u8 = 0b00;
-const REG_DE: u8 = 0b01;
-const REG_HL: u8 = 0b10;
-const REG_SP: u8 = 0b11;
+#[repr(u8)]
+#[derive(Debug, Copy, Clone)]
+enum Reg8 {
+    B = 0b000,
+    C = 0b001,
+    D = 0b010,
+    E = 0b011,
+    H = 0b100,
+    L = 0b101,
+    F = 0b110,
+    A = 0b111,
+}
+
+#[repr(u8)]
+#[derive(Debug, Copy, Clone)]
+enum Reg16 {
+    BC = 0b00,
+    DE = 0b01,
+    HL = 0b10,
+    SP = 0b11,
+}
+
+impl From<u8> for Reg8 {
+    fn from(val: u8) -> Self {
+        assert_eq!(val & 0b111, val);
+        unsafe { std::mem::transmute(val) }
+    }
+}
+
+impl From<u8> for Reg16 {
+    fn from(val: u8) -> Self {
+        assert_eq!(val & 0b11, val);
+        unsafe { std::mem::transmute(val) }
+    }
+}
 
 impl Context {
-    fn read_reg8(&self, reg: u8) -> u8 {
+    fn read_reg8(&self, reg: Reg8) -> u8 {
         self.general_purpose_regs[reg as usize]
     }
 
-    fn read_reg16(&self, reg: u8) -> u16 {
+    fn read_reg16(&self, reg: Reg16) -> u16 {
         match reg {
-            REG_BC => u16::from_be_bytes([self.read_reg8(REG_B), self.read_reg8(REG_C)]),
-            REG_DE => u16::from_be_bytes([self.read_reg8(REG_D), self.read_reg8(REG_E)]),
-            REG_HL => self.read_u16(u16::from_be_bytes([
-                self.read_reg8(REG_H),
-                self.read_reg8(REG_L),
+            Reg16::BC => u16::from_be_bytes([self.read_reg8(Reg8::B), self.read_reg8(Reg8::C)]),
+            Reg16::DE => u16::from_be_bytes([self.read_reg8(Reg8::D), self.read_reg8(Reg8::E)]),
+            Reg16::HL => self.read_u16(u16::from_be_bytes([
+                self.read_reg8(Reg8::H),
+                self.read_reg8(Reg8::L),
             ])),
-            REG_SP => self.stack_pointer,
-            _ => panic!("Unknown register"),
+            Reg16::SP => self.stack_pointer,
         }
     }
 
-    fn write_reg16(&mut self, reg: u8, value: u16) {
+    fn write_reg16(&mut self, reg: Reg16, value: u16) {
         let [high, low] = value.to_be_bytes();
         match reg {
-            REG_BC => {
-                self.write_reg8(REG_B, high);
-                self.write_reg8(REG_C, low);
+            Reg16::BC => {
+                self.write_reg8(Reg8::B, high);
+                self.write_reg8(Reg8::C, low);
             }
-            REG_DE => {
-                self.write_reg8(REG_D, high);
-                self.write_reg8(REG_E, low);
+            Reg16::DE => {
+                self.write_reg8(Reg8::D, high);
+                self.write_reg8(Reg8::E, low);
             }
-            REG_HL => {
-                let address = self.read_reg16(REG_HL);
+            Reg16::HL => {
+                let address = self.read_reg16(Reg16::HL);
                 self.write_u16(address, value);
             }
-            REG_SP => {
+            Reg16::SP => {
                 self.stack_pointer = value;
             }
-            _ => panic!("Unknown register"),
         }
     }
 
@@ -98,7 +118,7 @@ impl Context {
         self.write_u8(address + 1, low);
     }
 
-    fn write_reg8(&mut self, reg: u8, value: u8) {
+    fn write_reg8(&mut self, reg: Reg8, value: u8) {
         self.general_purpose_regs[reg as usize] = value;
     }
 
@@ -140,44 +160,21 @@ trait Disassembler {
 struct StaticDisassembler;
 struct DynamicDisassembler<'a>(&'a mut Context);
 
-fn reg8_to_str(reg: u8) -> &'static str {
-    match reg {
-        REG_B => "b",
-        REG_C => "c",
-        REG_D => "d",
-        REG_E => "e",
-        REG_H => "h",
-        REG_L => "l",
-        REG_F => "f",
-        REG_A => "a",
-        _ => "<invalid>",
-    }
-}
-fn reg16_to_str(reg: u8) -> &'static str {
-    match reg {
-        REG_BC => "bc",
-        REG_DE => "de",
-        REG_HL => "hl",
-        REG_SP => "sp",
-        _ => "<invalid>",
-    }
-}
-
 impl Disassembler for StaticDisassembler {
     fn address(&self) -> String {
-        String::from("(hl)")
+        String::from("(HL)")
     }
     fn peek_u8(&self) -> String {
-        String::from("n")
+        String::from("N")
     }
     fn peek_u16(&self) -> String {
-        String::from("nn")
+        String::from("NN")
     }
 }
 
 impl Disassembler for DynamicDisassembler<'_> {
     fn address(&self) -> String {
-        format!("@{:04x}", self.0.read_reg16(REG_HL))
+        format!("@{:04x}", self.0.read_reg16(Reg16::HL))
     }
     fn peek_u8(&self) -> String {
         format!(
@@ -194,44 +191,44 @@ impl Disassembler for DynamicDisassembler<'_> {
     }
 }
 
-fn load_reg8(dst: u8, src: u8) -> Instruction {
+fn load_reg8(dst: Reg8, src: Reg8) -> Instruction {
     Instruction::new(
         move |ctx| {
             let value = ctx.read_reg8(src);
             ctx.write_reg8(dst, value);
         },
-        move |_| format!("ld {}, {}", reg8_to_str(dst), reg8_to_str(src)),
+        move |_| format!("ld {dst:?}, {src:?}"),
     )
 }
 
-fn load_reg8_mem(dst: u8) -> Instruction {
+fn load_reg8_mem(dst: Reg8) -> Instruction {
     Instruction::new(
         move |ctx| {
-            let address = ctx.read_reg16(REG_HL);
+            let address = ctx.read_reg16(Reg16::HL);
             let value = ctx.read_u8(address);
             ctx.write_reg8(dst, value);
         },
-        move |disassembler| format!("ld {}, {}", reg8_to_str(dst), disassembler.address()),
+        move |disassembler| format!("ld {dst:?}, {}", disassembler.address()),
     )
 }
 
-fn load_reg8_const(dst: u8) -> Instruction {
+fn load_reg8_const(dst: Reg8) -> Instruction {
     Instruction::new(
         move |ctx| {
             let value = ctx.load_u8_const();
             ctx.write_reg8(dst, value);
         },
-        move |disassembler| format!("ld {}, {}", reg8_to_str(dst), disassembler.peek_u8()),
+        move |disassembler| format!("ld {dst:?}, {}", disassembler.peek_u8()),
     )
 }
 
-fn load_reg16_const(dst: u8) -> Instruction {
+fn load_reg16_const(dst: Reg16) -> Instruction {
     Instruction::new(
         move |ctx| {
             let value = ctx.load_u16_const();
             ctx.write_reg16(dst, value);
         },
-        move |disassembler| format!("ld {}, {}", reg16_to_str(dst), disassembler.peek_u16()),
+        move |disassembler| format!("ld {dst:?}, {}", disassembler.peek_u16()),
     )
 }
 
@@ -248,10 +245,10 @@ fn illegal_opcode(opcode: u8) -> Instruction {
 fn resolve_opcode(opcode: u8) -> Instruction {
     #[bitmatch]
     match opcode {
-        "01dd_d110" => load_reg8_mem(d),
-        "01dd_dsss" => load_reg8(d, s),
-        "00dd_d110" => load_reg8_const(d),
-        "00dd_d110" => load_reg16_const(d),
+        "01dd_d110" => load_reg8_mem(d.into()),
+        "01dd_dsss" => load_reg8(d.into(), s.into()),
+        "00dd_d110" => load_reg8_const(d.into()),
+        "00dd_d110" => load_reg16_const(d.into()),
         _ => illegal_opcode(opcode),
     }
 }
@@ -290,35 +287,35 @@ mod tests {
     #[test]
     fn load_reg8_mem_test() {
         let mut ctx = Context::default();
-        ctx.write_reg16(REG_HL, TEST_ADDRESS);
+        ctx.write_reg16(Reg16::HL, TEST_ADDRESS);
         ctx.write_u8(TEST_ADDRESS, TEST_VALUE_U8);
 
         let opcode = resolve_opcode(0b0111_1110);
 
-        assert_eq!((opcode.disassemble)(&StaticDisassembler), "ld a, (hl)");
+        assert_eq!((opcode.disassemble)(&StaticDisassembler), "ld A, (HL)");
         assert_eq!(
             (opcode.disassemble)(&DynamicDisassembler(&mut ctx)),
-            "ld a, @dead"
+            "ld A, @dead"
         );
 
         (opcode.execute)(&mut ctx);
-        assert_eq!(ctx.read_reg8(REG_A), TEST_VALUE_U8);
+        assert_eq!(ctx.read_reg8(Reg8::A), TEST_VALUE_U8);
     }
 
     #[test]
     fn load_reg8_test() {
         let mut ctx = Context::default();
-        ctx.write_reg8(REG_A, TEST_VALUE_U8);
-        ctx.write_reg8(REG_B, TEST_VALUE_U8_2);
+        ctx.write_reg8(Reg8::A, TEST_VALUE_U8);
+        ctx.write_reg8(Reg8::B, TEST_VALUE_U8_2);
 
         let opcode = resolve_opcode(0b0100_0111);
-        assert_eq!((opcode.disassemble)(&StaticDisassembler), "ld b, a");
+        assert_eq!((opcode.disassemble)(&StaticDisassembler), "ld B, A");
         assert_eq!(
             (opcode.disassemble)(&DynamicDisassembler(&mut ctx)),
-            "ld b, a"
+            "ld B, A"
         );
 
         (opcode.execute)(&mut ctx);
-        assert_eq!(ctx.read_reg8(REG_B), TEST_VALUE_U8);
+        assert_eq!(ctx.read_reg8(Reg8::B), TEST_VALUE_U8);
     }
 }
