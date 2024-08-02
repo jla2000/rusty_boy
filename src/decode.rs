@@ -39,7 +39,7 @@ fn load_reg8_indirect(dst: Reg8) -> Instruction {
             let value = cpu.read_u8(address);
             cpu.write_reg8(dst, value);
         },
-        format!("ld {dst:?}, hl"),
+        format!("ld {dst:?}, (HL)"),
     )
 }
 

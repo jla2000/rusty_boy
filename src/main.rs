@@ -63,14 +63,8 @@ mod tests {
         cpu.write_u8(TEST_ADDRESS, TEST_VALUE_U8);
 
         let opcode = decode_opcode(0b0111_1110);
-
-        assert_eq!((opcode.disassemble)(&StaticDisassembler), "ld A, (HL)");
-        assert_eq!(
-            (opcode.disassemble)(&DynamicDisassembler(&mut cpu)),
-            "ld A, @dead"
-        );
-
-        (opcode.execute)(&mut cpu);
+        assert_eq!(opcode.disassemble(), "ld A, (HL)");
+        opcode.execute(&mut cpu);
         assert_eq!(cpu.read_reg8(Reg8::A), TEST_VALUE_U8);
     }
 
@@ -81,13 +75,9 @@ mod tests {
         cpu.write_reg8(Reg8::B, TEST_VALUE_U8_2);
 
         let opcode = decode_opcode(0b0100_0111);
-        assert_eq!((opcode.disassemble)(&StaticDisassembler), "ld B, A");
-        assert_eq!(
-            (opcode.disassemble)(&DynamicDisassembler(&mut cpu)),
-            "ld B, A"
-        );
+        assert_eq!(opcode.disassemble(), "ld B, A");
 
-        (opcode.execute)(&mut cpu);
+        opcode.execute(&mut cpu);
         assert_eq!(cpu.read_reg8(Reg8::B), TEST_VALUE_U8);
     }
 }
