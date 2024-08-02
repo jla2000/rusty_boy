@@ -30,6 +30,7 @@ pub struct Cpu {
     pub memory_refresh: u8,
     // Memory
     pub memory: [u8; 0x10000],
+    pub jump_address: Option<u16>,
 }
 
 impl Default for Cpu {
@@ -42,6 +43,7 @@ impl Default for Cpu {
             index_y: Default::default(),
             memory_refresh: Default::default(),
             memory: [0; 0x10000],
+            jump_address: Default::default(),
         }
     }
 }
@@ -121,8 +123,9 @@ impl Cpu {
     }
 
     pub fn load_u8_const(&mut self) -> u8 {
+        let value = self.memory[self.program_counter as usize];
         self.program_counter += 1;
-        self.memory[self.program_counter as usize]
+        value
     }
 
     pub fn load_u16_const(&mut self) -> u16 {

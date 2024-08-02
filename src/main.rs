@@ -1,36 +1,40 @@
 mod alu;
 mod cpu;
+mod decode;
 mod instruction;
-mod translate;
+
+use std::io::{stdout, Write};
 
 use cpu::*;
+use decode::*;
 use instruction::*;
-use translate::*;
 
-fn build_instruction_set() -> Box<[Instruction]> {
+fn build_instruction_table() -> Box<[Instruction]> {
     (0..=u8::MAX)
-        .map(translate_opcode)
+        .map(decode_opcode)
         .collect::<Vec<Instruction>>()
         .into_boxed_slice()
 }
 
 fn main() {
-    let set = build_instruction_set();
+    let instruction_table = build_instruction_table();
     let mut cpu = Cpu::default();
 
     loop {
-        let opcode = cpu.load_u8_const();
-        let instruction = set.get(opcode as usize).unwrap();
-        let disassembled_instruction = (instruction.disassemble)(&DynamicDisassembler(&mut cpu));
+        let opcode = cpu.read_u8(cpu.program_counter);
+        let instruction = &instruction_table[opcode as usize];
+        let disassembled_instruction = instruction.disassemble();
 
         println!("-> {disassembled_instruction}");
-        (instruction.execute)(&mut cpu);
+        instruction.execute(&mut cpu);
 
-        if let Some(next_pc) = cpu.program_counter.checked_add(1) {
-            cpu.program_counter = next_pc;
+        if let Some(address) = cpu.jump_address.take() {
+            cpu.program_counter = address;
         } else {
-            println!("End of memory reached. Exiting loop");
-            break;
+            match cpu.program_counter.overflowing_add(1) {
+                (new_pc, false) => cpu.program_counter = new_pc,
+                (_, true) => break,
+            }
         }
     }
 }
@@ -44,8 +48,8 @@ mod tests {
     const TEST_VALUE_U8_2: u8 = 0xEF;
 
     #[test]
-    fn build_instruction_set_test() {
-        let table = build_instruction_set();
+    fn build_instruction_table_test() {
+        let table = build_instruction_table();
         assert_eq!(table.len(), 256);
     }
 
@@ -55,7 +59,7 @@ mod tests {
         cpu.write_reg16(Reg16::HL, TEST_ADDRESS);
         cpu.write_u8(TEST_ADDRESS, TEST_VALUE_U8);
 
-        let opcode = translate_opcode(0b0111_1110);
+        let opcode = decode_opcode(0b0111_1110);
 
         assert_eq!((opcode.disassemble)(&StaticDisassembler), "ld A, (HL)");
         assert_eq!(
@@ -73,7 +77,7 @@ mod tests {
         cpu.write_reg8(Reg8::A, TEST_VALUE_U8);
         cpu.write_reg8(Reg8::B, TEST_VALUE_U8_2);
 
-        let opcode = translate_opcode(0b0100_0111);
+        let opcode = decode_opcode(0b0100_0111);
         assert_eq!((opcode.disassemble)(&StaticDisassembler), "ld B, A");
         assert_eq!(
             (opcode.disassemble)(&DynamicDisassembler(&mut cpu)),

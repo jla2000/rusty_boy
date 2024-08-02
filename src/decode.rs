@@ -4,7 +4,7 @@ use crate::alu::*;
 use crate::{Instruction, Reg16, Reg8};
 
 #[bitmatch]
-pub fn translate_opcode(opcode: u8) -> Instruction {
+pub fn decode_opcode(opcode: u8) -> Instruction {
     #[bitmatch]
     match opcode {
         "0000_0000" => nop(),
@@ -19,7 +19,7 @@ pub fn translate_opcode(opcode: u8) -> Instruction {
 }
 
 fn nop() -> Instruction {
-    Instruction::new(move |_| {}, move |_| String::from("nop"))
+    Instruction::new(move |_| {}, "nop")
 }
 
 fn load_reg8(dst: Reg8, src: Reg8) -> Instruction {
@@ -28,7 +28,7 @@ fn load_reg8(dst: Reg8, src: Reg8) -> Instruction {
             let value = cpu.read_reg8(src);
             cpu.write_reg8(dst, value);
         },
-        move |_| format!("ld {dst:?}, {src:?}"),
+        format!("ld {dst:?}, {src:?}"),
     )
 }
 
@@ -39,7 +39,7 @@ fn load_reg8_indirect(dst: Reg8) -> Instruction {
             let value = cpu.read_u8(address);
             cpu.write_reg8(dst, value);
         },
-        move |disassembler| format!("ld {dst:?}, {}", disassembler.address()),
+        format!("ld {dst:?}, hl"),
     )
 }
 
@@ -49,7 +49,7 @@ fn load_reg8_const(dst: Reg8) -> Instruction {
             let value = cpu.load_u8_const();
             cpu.write_reg8(dst, value);
         },
-        move |disassembler| format!("ld {dst:?}, {}", disassembler.peek_u8()),
+        format!("ld {dst:?}, n"),
     )
 }
 
@@ -59,7 +59,7 @@ fn load_reg16_const(dst: Reg16) -> Instruction {
             let value = cpu.load_u16_const();
             cpu.write_reg16(dst, value);
         },
-        move |disassembler| format!("ld {dst:?}, {}", disassembler.peek_u16()),
+        format!("ld {dst:?}, nn"),
     )
 }
 
@@ -70,7 +70,7 @@ fn add_a(src: Reg8) -> Instruction {
             cpu.write_reg8(Reg8::A, result);
             cpu.write_reg8(Reg8::F, flags.into());
         },
-        move |_| format!("add A, {src:?}"),
+        format!("add A, {src:?}"),
     )
 }
 
@@ -78,9 +78,9 @@ fn jump() -> Instruction {
     Instruction::new(
         move |cpu| {
             let address = cpu.load_u16_const();
-            cpu.program_counter = address;
+            cpu.jump_address = Some(address);
         },
-        move |disassembler| format!("jump {}", disassembler.peek_u16()),
+        format!("jump nn"),
     )
 }
 
@@ -89,6 +89,6 @@ fn illegal_opcode(opcode: u8) -> Instruction {
         move |_| {
             panic!("Invalid opcode {opcode:02x}");
         },
-        move |_| String::from("illegal"),
+        "<illegal>",
     )
 }
