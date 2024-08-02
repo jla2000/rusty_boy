@@ -9,9 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: DeterminateSystems/nix-installer-action@main
-    - uses: DeterminateSystems/magic-nix-cache-action@main
     - name: Build
-      run: nix develop .# -c cargo build --verbose
+      run: cargo build
     - name: Run tests
-      run: nix develop .# -c cargo test --verbose
+      run: cargo test
