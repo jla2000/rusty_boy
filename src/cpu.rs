@@ -43,7 +43,7 @@ impl Default for Cpu {
             index_y: Default::default(),
             memory_refresh: Default::default(),
             memory: [0; 0x10000],
-            jump_address: Default::default(),
+            jump_address: None,
         }
     }
 }
@@ -124,7 +124,7 @@ impl Cpu {
 
     pub fn load_u8_const(&mut self) -> u8 {
         let value = self.memory[self.program_counter as usize];
-        self.program_counter += 1;
+        self.program_counter = self.program_counter.checked_add(1).unwrap();
         value
     }
 

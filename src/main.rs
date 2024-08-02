@@ -25,15 +25,18 @@ fn main() {
         let instruction = &instruction_table[opcode as usize];
         let disassembled_instruction = instruction.disassemble();
 
-        println!("-> {disassembled_instruction}");
+        println!(
+            "{address:04x}: {disassembled_instruction}",
+            address = cpu.program_counter
+        );
         instruction.execute(&mut cpu);
 
         if let Some(address) = cpu.jump_address.take() {
             cpu.program_counter = address;
         } else {
-            match cpu.program_counter.overflowing_add(1) {
-                (new_pc, false) => cpu.program_counter = new_pc,
-                (_, true) => break,
+            match cpu.program_counter.checked_add(1) {
+                Some(pc) => cpu.program_counter = pc,
+                None => break,
             }
         }
     }
