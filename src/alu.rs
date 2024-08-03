@@ -8,6 +8,10 @@ pub const CARRY_BIT: u8 = 0;
 pub struct Flags(u8);
 
 impl Flags {
+    pub fn from(value: u8) -> Self {
+        Self(value)
+    }
+
     pub fn set(&mut self, flag_bit: u8, enabled: bool) {
         if enabled {
             self.0 |= 1 << flag_bit;
@@ -30,7 +34,7 @@ pub fn alu_add(left: u8, right: u8) -> (u8, Flags) {
     let (result, carry) = left.overflowing_add(right);
 
     let mut flags = Flags(0);
-    flags.set(SIGN_BIT, left & 0b1000_0000 != 0);
+    flags.set(SIGN_BIT, result & 0b1000_0000 != 0);
     flags.set(ZERO_BIT, result == 0);
     flags.set(HALF_CARRY_BIT, ((left & 0xf) + (right & 0xf)) > 0xf);
     flags.set(

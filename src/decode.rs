@@ -14,6 +14,7 @@ pub fn decode_opcode(opcode: u8) -> Instruction {
         "00dd_0001" => load_reg16_const(d.into()),
         "1000_0ddd" => add_a(d.into()),
         "1100_0011" => jump(),
+        "1100_1011" => jump_indirect(),
         _ => illegal_opcode(opcode),
     }
 }
@@ -28,7 +29,7 @@ fn load_reg8(dst: Reg8, src: Reg8) -> Instruction {
             let value = cpu.read_reg8(src);
             cpu.write_reg8(dst, value);
         },
-        format!("ld {dst:?}, {src:?}"),
+        format!("ld {dst}, {src}"),
     )
 }
 
@@ -36,30 +37,30 @@ fn load_reg8_indirect(dst: Reg8) -> Instruction {
     Instruction::new(
         move |cpu| {
             let address = cpu.read_reg16(Reg16::HL);
-            let value = cpu.read_u8(address);
+            let value = cpu.read_mem8(address);
             cpu.write_reg8(dst, value);
         },
-        format!("ld {dst:?}, (HL)"),
+        format!("ld {dst}, (hl)"),
     )
 }
 
 fn load_reg8_const(dst: Reg8) -> Instruction {
     Instruction::new(
         move |cpu| {
-            let value = cpu.load_u8_const();
+            let value = cpu.load_mem8_const();
             cpu.write_reg8(dst, value);
         },
-        format!("ld {dst:?}, n"),
+        format!("ld {dst}, n"),
     )
 }
 
 fn load_reg16_const(dst: Reg16) -> Instruction {
     Instruction::new(
         move |cpu| {
-            let value = cpu.load_u16_const();
+            let value = cpu.load_mem16_const();
             cpu.write_reg16(dst, value);
         },
-        format!("ld {dst:?}, nn"),
+        format!("ld {dst}, nn"),
     )
 }
 
@@ -70,17 +71,24 @@ fn add_a(src: Reg8) -> Instruction {
             cpu.write_reg8(Reg8::A, result);
             cpu.write_reg8(Reg8::F, flags.into());
         },
-        format!("add A, {src:?}"),
+        format!("add a, {src}"),
     )
 }
 
 fn jump() -> Instruction {
     Instruction::new(
         move |cpu| {
-            let address = cpu.load_u16_const();
+            let address = cpu.load_mem16_const();
             cpu.jump_address = Some(address);
         },
-        format!("jump nn"),
+        "jp nn",
+    )
+}
+
+fn jump_indirect() -> Instruction {
+    Instruction::new(
+        move |cpu| cpu.jump_address = Some(cpu.read_reg16(Reg16::HL)),
+        "jp (hl)",
     )
 }
 
