@@ -1,6 +1,8 @@
 use core::fmt;
 use std::fmt::Write;
 
+use crate::alu::Flags;
+
 #[repr(u8)]
 #[derive(Debug, Copy, Clone)]
 pub enum Reg8 {
@@ -63,21 +65,18 @@ impl fmt::Display for Reg16 {
 }
 impl fmt::Display for Cpu {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let strings = self
-            .general_purpose_regs
-            .iter()
-            .take(8)
-            .enumerate()
-            .map(|(reg, val)| format!("{}=0x{:02x} ", Reg8::from(reg as u8), val))
-            .collect::<Vec<String>>();
-
-        for r in strings {
-            f.write_str(&r)?;
-        }
-        f.write_str(&format!("pc: 0x{:04x} ", self.program_counter))?;
-        f.write_str(&format!("sp: 0x{:04x} ", self.stack_pointer))?;
-        f.write_str(&format!("index_x: 0x{:04x} ", self.index_x))?;
-        f.write_str(&format!("index_y: 0x{:04x} ", self.index_y))?;
+        f.write_fmt(format_args!("a: 0x{:02x} ", self.read_reg8(Reg8::A)))?;
+        f.write_fmt(format_args!("bc: 0x{:04x} ", self.read_reg16(Reg16::BC)))?;
+        f.write_fmt(format_args!("de: 0x{:04x} ", self.read_reg16(Reg16::DE)))?;
+        f.write_fmt(format_args!("hl: 0x{:04x} ", self.read_reg16(Reg16::HL)))?;
+        f.write_fmt(format_args!("pc: 0x{:04x} ", self.program_counter))?;
+        f.write_fmt(format_args!("sp: 0x{:04x} ", self.stack_pointer))?;
+        f.write_fmt(format_args!("index_x: 0x{:04x} ", self.index_x))?;
+        f.write_fmt(format_args!("index_y: 0x{:04x} ", self.index_y))?;
+        f.write_fmt(format_args!(
+            "flags: {}",
+            Flags::from(self.read_reg8(Reg8::F))
+        ))?;
 
         Ok(())
     }

@@ -1,3 +1,6 @@
+use core::fmt;
+use std::fmt::Write;
+
 pub const SIGN_BIT: u8 = 7;
 pub const ZERO_BIT: u8 = 6;
 pub const HALF_CARRY_BIT: u8 = 4;
@@ -27,6 +30,18 @@ impl Flags {
 impl From<Flags> for u8 {
     fn from(val: Flags) -> Self {
         val.0
+    }
+}
+
+impl fmt::Display for Flags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = self.get(SIGN_BIT) as u8;
+        let z = self.get(ZERO_BIT) as u8;
+        let h = self.get(HALF_CARRY_BIT) as u8;
+        let pv = self.get(PARITY_OVERFLOW_BIT) as u8;
+        let n = self.get(SUBTRACT_BIT) as u8;
+        let c = self.get(CARRY_BIT) as u8;
+        f.write_fmt(format_args!("|S:{s} Z:{z} H:{h} PV: {pv} N:{n} C:{c}|"))
     }
 }
 
