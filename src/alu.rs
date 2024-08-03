@@ -41,7 +41,7 @@ impl fmt::Display for Flags {
         let pv = self.get(PARITY_OVERFLOW_BIT) as u8;
         let n = self.get(SUBTRACT_BIT) as u8;
         let c = self.get(CARRY_BIT) as u8;
-        f.write_fmt(format_args!("|S:{s} Z:{z} H:{h} PV: {pv} N:{n} C:{c}|"))
+        f.write_fmt(format_args!("|s:{s} z:{z} h:{h} pv: {pv} n:{n} c:{c}|"))
     }
 }
 
