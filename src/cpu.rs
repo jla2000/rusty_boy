@@ -1,4 +1,5 @@
 use core::fmt;
+use std::fmt::Write;
 
 #[repr(u8)]
 #[derive(Debug, Copy, Clone)]
@@ -20,17 +21,6 @@ pub enum Reg16 {
     DE = 0b01,
     HL = 0b10,
     SP = 0b11,
-}
-
-impl fmt::Display for Reg8 {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&format!("{:?}", self).to_lowercase())
-    }
-}
-impl fmt::Display for Reg16 {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&format!("{:?}", self).to_lowercase())
-    }
 }
 
 pub struct Cpu {
@@ -58,6 +48,38 @@ impl Default for Cpu {
             memory: [0; 0x10000],
             jump_address: None,
         }
+    }
+}
+
+impl fmt::Display for Reg8 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&format!("{:?}", self).to_lowercase())
+    }
+}
+impl fmt::Display for Reg16 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&format!("{:?}", self).to_lowercase())
+    }
+}
+impl fmt::Display for Cpu {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let strings = self
+            .general_purpose_regs
+            .iter()
+            .take(8)
+            .enumerate()
+            .map(|(reg, val)| format!("{}=0x{:02x} ", Reg8::from(reg as u8), val))
+            .collect::<Vec<String>>();
+
+        for r in strings {
+            f.write_str(&r)?;
+        }
+        f.write_str(&format!("pc: 0x{:04x} ", self.program_counter))?;
+        f.write_str(&format!("sp: 0x{:04x} ", self.stack_pointer))?;
+        f.write_str(&format!("index_x: 0x{:04x} ", self.index_x))?;
+        f.write_str(&format!("index_y: 0x{:04x} ", self.index_y))?;
+
+        Ok(())
     }
 }
 

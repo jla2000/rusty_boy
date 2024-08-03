@@ -23,10 +23,8 @@ fn main() {
         let instruction = &instruction_table[opcode as usize];
         let disassembled_instruction = instruction.disassemble();
 
-        println!(
-            "{address:04x}: {disassembled_instruction}",
-            address = cpu.program_counter
-        );
+        println!("State: {}", &cpu);
+        println!("{disassembled_instruction}",);
         instruction.execute(&mut cpu);
 
         if let Some(address) = cpu.jump_address.take() {
@@ -38,6 +36,8 @@ fn main() {
             }
         }
     }
+
+    println!("Program end reached");
 }
 
 #[cfg(test)]
