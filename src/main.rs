@@ -108,8 +108,8 @@ mod tests {
         assert_eq!(cpu.read_reg8(Reg8::A), 0xff);
 
         let flags = Flags::from(cpu.read_reg8(Reg8::F));
-        assert_eq!(flags.get(SIGN_BIT), true);
-        assert_eq!(flags.get(ZERO_BIT), false);
+        assert!(flags.get(SIGN_BIT));
+        assert!(!flags.get(ZERO_BIT));
         assert_eq!(flags.get(HALF_CARRY_BIT), false);
         assert_eq!(flags.get(PARITY_OVERFLOW_BIT), false);
         assert_eq!(flags.get(SUBTRACT_BIT), false);
@@ -129,12 +129,12 @@ mod tests {
         assert_eq!(cpu.read_reg8(Reg8::A), 0x00);
 
         let flags = Flags::from(cpu.read_reg8(Reg8::F));
-        assert_eq!(flags.get(SIGN_BIT), false);
-        assert_eq!(flags.get(ZERO_BIT), true);
-        assert_eq!(flags.get(HALF_CARRY_BIT), true);
-        assert_eq!(flags.get(PARITY_OVERFLOW_BIT), false);
-        assert_eq!(flags.get(SUBTRACT_BIT), false);
-        assert_eq!(flags.get(CARRY_BIT), true);
+        assert!(!flags.get(SIGN_BIT));
+        assert!(flags.get(ZERO_BIT));
+        assert!(flags.get(HALF_CARRY_BIT));
+        assert!(!flags.get(PARITY_OVERFLOW_BIT));
+        assert!(!flags.get(SUBTRACT_BIT));
+        assert!(flags.get(CARRY_BIT));
     }
 
     #[test]
